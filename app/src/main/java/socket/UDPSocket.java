@@ -18,6 +18,8 @@ import java.util.concurrent.Executors;
 
 import application.MyApplication;
 import bean.Constants;
+import bean.ControlDevice;
+import bean.DevideResponse;
 import bean.Heartbeat;
 import bean.HelloData;
 import bean.ServerHelloData;
@@ -36,6 +38,7 @@ public class UDPSocket implements SensorEventListener {
     public static final int SERVER_PORT = 9202;
     public static short HELLO = 0x1001;//客户端消息ID
     public static short HEART=0x1000;//心跳包消息ID
+    public static short DEVIDESPONSE = 0x0004;//客户端应答消息ID
     public static short MSGLENGTH = 33;
     public static long PHONENUM=Long.valueOf("0000013570466112");
     public static short MSGNUM = 1;//客户端应答流水号
@@ -78,6 +81,10 @@ public class UDPSocket implements SensorEventListener {
     private SensorManager mSensorManager;
     //传感器XYZ
     private short x,y,z;
+    //接收服务器下发命令数据
+    private ControlDevice controlDevice;
+    //应答服务器的通用数据包
+    private DevideResponse devideResponse;
     public UDPSocket(Context context) {
         this.mContext = context;
         //得到手机的CPU核数
@@ -91,7 +98,7 @@ public class UDPSocket implements SensorEventListener {
                 (byte)0x2,HELLO,MSGLENGTH,PHONENUM,MSGNUM,HAS,MACHINE_TYPE,
                 CUSTOMER_NAME,SIM_OPERATOR,new byte[]{1},VERSIONCODE,VINCODE);
         isOK=false;
-        heart=new Heartbeat((byte)0x2,HEART,(short)55,PHONENUM,MSGNUM,HAS);
+        heart=new Heartbeat((byte)0x4,HEART,(short)56,PHONENUM,MSGNUM,HAS);
         heart.init(MyApplication.getContext());
         mSensorManager = (SensorManager)MyApplication.getContext().getSystemService(SENSOR_SERVICE);// 获取传感器管理服务
         // 为系统的方向传感器注册监听器
@@ -103,7 +110,6 @@ public class UDPSocket implements SensorEventListener {
         }catch (Exception e){
             e.printStackTrace();
         }
-        heart.setSpeed((byte) x);
         heart.setSensorX(x);
         Log.d(TAG, "UDPSocketX: "+heart.getSensorX());
         heart.setSensorY(y);
@@ -248,7 +254,7 @@ public class UDPSocket implements SensorEventListener {
                             (message, message.length, targetAddress, SERVER_PORT);
                     client.send(packet);
                     // 数据发送事件
-                    Log.d(TAG, "心跳包发送成功");
+                    Log.d(TAG, "心跳包/应答 发送成功");
                 } catch (UnknownHostException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
@@ -322,9 +328,65 @@ public class UDPSocket implements SensorEventListener {
                     }
                     break;
                 case Constants.CONTROL:
-                    if(receivePacket.getData()[17]==(short)0x01){
-                        Log.d(TAG, "receiveMessage: "+"d");
+                    controlDevice = new ControlDevice(
+                            receivePacket.getData()[1],
+                            Utility.byte2Short(new byte[]{receivePacket.getData()[2], receivePacket.getData()[3]}),
+                            Utility.byte2Short(new byte[]{receivePacket.getData()[4], receivePacket.getData()[5]}),
+                            Utility.byte2Long(new byte[]{receivePacket.getData()[6], receivePacket.getData()[7],
+                                    receivePacket.getData()[8], receivePacket.getData()[9],
+                                    receivePacket.getData()[10], receivePacket.getData()[11],
+                                    receivePacket.getData()[12], receivePacket.getData()[13]}),
+                            Utility.byte2Short(new byte[]{receivePacket.getData()[14], receivePacket.getData()[15]}),
+                            receivePacket.getData()[16],
+                            Utility.byte2Long(new byte[]{receivePacket.getData()[18], receivePacket.getData()[19],
+                                    receivePacket.getData()[20], receivePacket.getData()[21],
+                                    receivePacket.getData()[22], receivePacket.getData()[23],
+                                    receivePacket.getData()[24], receivePacket.getData()[25]}),
+                            receivePacket.getData()[17],
+                            receivePacket.getData()[26]
+                    );
+                    /*0000016435aebd13*/
+                    Log.d(TAG, "receiveMessage: "+"pop"+Utility.byte2Long(new byte[]{receivePacket.getData()[18], receivePacket.getData()[19],
+                            receivePacket.getData()[20], receivePacket.getData()[21],
+                            receivePacket.getData()[22], receivePacket.getData()[23],
+                            receivePacket.getData()[24], receivePacket.getData()[25]}));
+                    Log.d(TAG, "receiveMessage: "+"pop1"+Utility.bytesToHexFun2(Utility.long2Byte(controlDevice.getControlTime())));
+                    try {
+                        short temp=controlDevice.getMsgLength(controlDevice.getMsgAttribute());
+                        int tempMsgLength=temp-10;
+                        byte[] tempMsg=new byte[tempMsgLength];
+                        for(int i=0;i<tempMsgLength;i++){
+                            tempMsg[i]=receivePacket.getData()[27+i];
+                        }
+                        controlDevice.setControlMsg(tempMsg);
+                    }catch (Exception e){
+                        e.printStackTrace();
                     }
+                    if(controlDevice.getControlId()==(byte)0x01){
+                        Log.d(TAG, "receiveMessage: "+"control1");
+                        Log.d(TAG, "receiveMessage: "+"control1Msg"+controlDevice.getControlMsg().toString());
+                        //客户端通用应答
+                        //测试
+                        byte test = 0x31;
+                        byte[] temptest=new byte[]{test};
+                        Log.d(TAG, "receiveMessage: "+"测试"+Utility.bytesToHexFun2(receivePacket.getData()));
+                        Log.d(TAG, "receiveMessage: "+"测试"+controlDevice.getMsgId()+","+controlDevice.getMsgnum()+","+controlDevice.getControlTime());
+                        byte[] temptime=new byte[]{
+                                receivePacket.getData()[18], receivePacket.getData()[19],
+                                receivePacket.getData()[20], receivePacket.getData()[21],
+                                receivePacket.getData()[22], receivePacket.getData()[23],
+                                receivePacket.getData()[24], receivePacket.getData()[25]
+                        };
+                        devideResponse = new DevideResponse((byte) 0x02,
+                                DEVIDESPONSE, (short) (14 + 1), PHONENUM, MSGNUM, HAS, (byte) 1, (byte) 0x01,
+                                Constants.CONTROL, controlDevice.getMsgnum(), controlDevice.getControlTime(), temptest);
+                        devideResponse.setTime(temptime);
+                        Log.d(TAG, "receiveMessage: "+"测试发送字节"+Utility.bytesToHexFun2(devideResponse.getbytes()));
+                        sendMessage(devideResponse.getbytes());
+                    }
+                    break;
+                default:
+                    break;
             }
             // 每次接收完UDP数据后，重置长度。否则可能会导致下次收到数据包被截断。
             if (receivePacket != null) {
@@ -402,6 +464,10 @@ public class UDPSocket implements SensorEventListener {
              y = (short)sensorEvent.values[SensorManager.DATA_Y];
              z = (short)sensorEvent.values[SensorManager.DATA_Z];
         }
+        Log.d(TAG, "onSensorChanged: "+heart.getSensorX());
+        heart.setSensorX(x);
+        heart.setSensorY(y);
+        heart.setSensorZ(z);
     }
 
     @Override

@@ -26,7 +26,7 @@ public class Heartbeat extends BasePacket{
     private byte gps;//GPS
     private float latitude;//维度
     private float longitude;//经度
-    private byte speed;//当前速度
+    private short speed;//当前速度
     private short sensorX;//传感器X
     private short sensorY;//传感器Y
     private short sensorZ;//传感器Z
@@ -54,6 +54,8 @@ public class Heartbeat extends BasePacket{
             this.latitude=(float)location.getLatitude();
             Log.d(TAG, "init: "+(float)location.getLatitude());
             this.longitude=(float)location.getLongitude();
+            this.speed = (short) ((int) location.getSpeed());
+            Log.d(TAG, "init: "+"locationspeed"+location.getSpeed());
         }else {
             this.latitude = 0f;
             this.longitude = 0f;
@@ -69,13 +71,15 @@ public class Heartbeat extends BasePacket{
         Log.d(TAG, "init: "+"testcpuusage3"+" "+(int)(CpuManager.getTotalCpuRate()));
         this.availableMemory=(short)(MemInfo.getRomMemroy()[1]/(1024*1024));
         Log.d(TAG, "init: "+"availableMemory"+" "+availableMemory);
-        this.bootTime=(byte)(SystemClock.elapsedRealtimeNanos()/(1000*60*60));
+        Log.d(TAG, "init: "+"changebeforeboottime"+(SystemClock.elapsedRealtimeNanos()/(1000*1000*1000*60*60)));
+        this.bootTime=(byte)(SystemClock.elapsedRealtimeNanos()/(1000*1000*60*60));
         Log.d(TAG, "init: "+"boottime"+bootTime);
-        this.gpsInuse=(byte)LocationUtil.count;
+        this.gpsInuse=(byte) LocationUtil.getInstance(context).getCount();
         Log.d(TAG, "init: "+"gpsuse"+gpsInuse);
         startGetSignal(context);
         this.status=new byte[]{0,0,0};
         this.vincode="he";
+        Log.d(TAG, "init: speed"+speed);
     }
     public void startGetSignal(Context c){
         //1.获得TelephoneManager:
@@ -151,37 +155,38 @@ public class Heartbeat extends BasePacket{
        tobyte[23]=Utility.float2byte(longitude)[1];
        tobyte[24]=Utility.float2byte(longitude)[2];
        tobyte[25]=Utility.float2byte(longitude)[3];
-       tobyte[26]=speed;
-       tobyte[27]=Utility.short2Byte(sensorX)[0];
-       tobyte[28]=Utility.short2Byte(sensorX)[1];
-       tobyte[29]=Utility.short2Byte(sensorY)[0];
-       tobyte[30]=Utility.short2Byte(sensorY)[1];
-       tobyte[31]=Utility.short2Byte(sensorZ)[0];
-       tobyte[32]=Utility.short2Byte(sensorZ)[1];
-       tobyte[33]=Utility.short2Byte(cpuTemp)[0];
-       tobyte[34]=Utility.short2Byte(cpuTemp)[1];
-       tobyte[35]=Utility.short2Byte(soc)[0];
-       tobyte[36]=Utility.short2Byte(soc)[1];
-       tobyte[37]=Utility.int2Byte(odo)[0];
-       tobyte[38]=Utility.int2Byte(odo)[1];
-       tobyte[39]=Utility.int2Byte(odo)[2];
-       tobyte[40]=Utility.int2Byte(odo)[3];
-       tobyte[41]=socStatus;
-       tobyte[42]=Utility.short2Byte(volt)[0];
-       tobyte[43]=Utility.short2Byte(volt)[1];
-       tobyte[44]=memory;
-       tobyte[45]=cpuUsage;
-       tobyte[46]=Utility.short2Byte(availableMemory)[0];
-       tobyte[47]=Utility.short2Byte(availableMemory)[1];
-       tobyte[48]=bootTime;
-       tobyte[49]=gpsInuse;
+       tobyte[26]=Utility.short2Byte(speed)[0];
+       tobyte[27]=Utility.short2Byte(speed)[1];
+       tobyte[28]=Utility.short2Byte(sensorX)[0];
+       tobyte[29]=Utility.short2Byte(sensorX)[1];
+       tobyte[30]=Utility.short2Byte(sensorY)[0];
+       tobyte[31]=Utility.short2Byte(sensorY)[1];
+       tobyte[32]=Utility.short2Byte(sensorZ)[0];
+       tobyte[33]=Utility.short2Byte(sensorZ)[1];
+       tobyte[34]=Utility.short2Byte(cpuTemp)[0];
+       tobyte[35]=Utility.short2Byte(cpuTemp)[1];
+       tobyte[36]=Utility.short2Byte(soc)[0];
+       tobyte[37]=Utility.short2Byte(soc)[1];
+       tobyte[38]=Utility.int2Byte(odo)[0];
+       tobyte[39]=Utility.int2Byte(odo)[1];
+       tobyte[40]=Utility.int2Byte(odo)[2];
+       tobyte[41]=Utility.int2Byte(odo)[3];
+       tobyte[42]=socStatus;
+       tobyte[43]=Utility.short2Byte(volt)[0];
+       tobyte[44]=Utility.short2Byte(volt)[1];
+       tobyte[45]=memory;
+       tobyte[46]=cpuUsage;
+       tobyte[47]=Utility.short2Byte(availableMemory)[0];
+       tobyte[48]=Utility.short2Byte(availableMemory)[1];
+       tobyte[49]=bootTime;
        tobyte[50]=gpsInuse;
-       tobyte[51]=gsignal;
-       tobyte[52]=status[0];
-       tobyte[53]=status[1];
-       tobyte[54]=status[2];
+       tobyte[51]=gpsInuse;
+       tobyte[52]=gsignal;
+       tobyte[53]=status[0];
+       tobyte[54]=status[1];
+       tobyte[55]=status[2];
        for(int i=0;i<vincode.getBytes().length;i++){
-           tobyte[55+i]=vincode.getBytes()[i];
+           tobyte[56+i]=vincode.getBytes()[i];
        }
        tobyte[16+1+templen]=check();
        tobyte[16+1+templen+1]=identify;
@@ -326,11 +331,11 @@ public class Heartbeat extends BasePacket{
         this.socStatus = socStatus;
     }
 
-    public byte getSpeed() {
+    public short getSpeed() {
         return speed;
     }
 
-    public void setSpeed(byte speed) {
+    public void setSpeed(short speed) {
         this.speed = speed;
     }
 

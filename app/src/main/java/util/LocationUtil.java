@@ -17,6 +17,8 @@ import android.util.Log;
 import java.util.Iterator;
 import java.util.List;
 
+import bean.Heartbeat;
+
 /**
  * Created by yy on 2018/6/22.
  */
@@ -32,6 +34,9 @@ public class LocationUtil {
     private LocationUtil(Context context) {
         mContext = context;
         getLocation();
+    }
+    public int getCount(){
+        return count;
     }
     //采用Double CheckLock(DCL)实现单例
     public static LocationUtil getInstance(Context context) {
